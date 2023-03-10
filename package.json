@@ -1,6 +1,6 @@
 {
   "name": "light-charts",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "一个轻量、定制化的react基础图表库",
   "main": "lib/index.js",
   "module": "es/index.js",
