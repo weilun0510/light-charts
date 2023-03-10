@@ -1,8 +1,8 @@
 import React, { useLayoutEffect } from 'react'
 import './index.css';
 
-// import { COLOR, TEXT_COLOR, BG_COLOR } from '../../colors';
-import { COLOR, TEXT_COLOR, BG_COLOR } from '../../colors/light';
+import { COLOR, TEXT_COLOR, BG_COLOR } from '../../colors';
+// import { COLOR, TEXT_COLOR, BG_COLOR } from '../../colors/light';
 import { renderLine, xAxisTickPointX, valueHeight, renderText, yAxisTickText, setCanvasSize, mergeObject } from '../../utils/common';
 
 const KLine = ({ option = {}, loadData, style = { width: '600px', height: '300px' } }) => {
@@ -25,7 +25,7 @@ const KLine = ({ option = {}, loadData, style = { width: '600px', height: '300px
     // y轴分段数量
     yAxisSplitNumber: 4,
     // 背景色
-    backgroundColor: 'LIGHT',
+    backgroundColor: 'DARK',
     // x轴元素「文字和刻度」最大展示个数
     xAxisItemMaxShowNumber: 5,
     // 坐标轴与容器间的边距

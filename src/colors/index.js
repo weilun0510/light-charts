@@ -12,7 +12,7 @@ const TEXT_COLOR = {
   SECOND: '#666',
 }
 const BG_COLOR = {
-  LIGHT: '#ffffff',
+  LIGHT: '#F5F5F5',
   DARK: '#100C2A',
 }
 
