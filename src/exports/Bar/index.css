@@ -1,0 +1,9 @@
+#canvasWrap{
+  position: relative;
+  left: 0;
+}
+#tipCanvas{
+  position: absolute;
+  left: 0;
+  top: 0;
+}

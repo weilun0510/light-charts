@@ -8,8 +8,8 @@
  */
 export const setCanvasSize = (canvasEl, style, gridWidth = 'auto', gridHeight = 'auto') => {
   const ctx = canvasEl.getContext('2d')
-  const width = style.width.slice(0, -2)
-  const height = style.height.slice(0, -2)
+  const width = +style.width.slice(0, -2)
+  const height = +style.height.slice(0, -2)
 
   // 设置css样式
   canvasEl.style.width = width + 'px'
@@ -61,12 +61,12 @@ export const renderLine = (ctx, sx, sy, ex, ey, lineColor = COLOR.BLACK, lineWid
    * @param {string} align 文本对齐方式
    * @param {string} color 文本颜色
    */
-export const renderText = (ctx, x, y, text, align = 'left', color = '#FFF') => {
+export const renderText = (ctx, x, y, text, align = 'left', color = '#FFF', font = '12px') => {
   ctx.fillStyle = color;  // 文字颜色
   ctx.textBaseline = "middle";
   ctx.textAlign = align;
 
-  ctx.font = "10px Arial";  // 高为10px的字体
+  ctx.font = `${font} Arial`;  // 大小、字体
   ctx.fillText(text, x, y)  // 描绘实体文字
 }
 
@@ -76,12 +76,13 @@ export const renderText = (ctx, x, y, text, align = 'left', color = '#FFF') => {
  * @param {number} maxValue 最大值
  * @param {number} minValue 最小值
  * @param {number} yAxisHeight y轴高度
+ * @param {number} fractionDigits 保留几位小数
  * @returns number 刻度对应的数值
  */
-export const yAxisTickText = (height, maxValue, minValue, yAxisHeight) => {
+export const yAxisTickText = (height, maxValue, minValue, yAxisHeight, fractionDigits = 2) => {
   // value 与 y轴高度的比例
   const ratio = (maxValue - minValue) / yAxisHeight
-  const value = (minValue + height * ratio).toFixed(2)
+  const value = (minValue + height * ratio).toFixed(fractionDigits)
   return value
 }
 
@@ -89,11 +90,11 @@ export const yAxisTickText = (height, maxValue, minValue, yAxisHeight) => {
  * 求x轴刻度横坐标
  * @param {number} i 下标
  * @param {number} xAxisPointX x轴原点横坐标
- * @param {number} xAxisItemSpace x轴刻度间距
+ * @param {number} xAxisItemWidth x轴元素宽度
  * @returns number x轴刻度横坐标
  */
-export const xAxisTickPointX = (i, xAxisPointX, xAxisItemSpace) => {
-  return xAxisPointX + i * xAxisItemSpace
+export const xAxisTickPointX = (i, xAxisPointX, xAxisItemWidth) => {
+  return xAxisPointX + i * xAxisItemWidth
 }
 
 /**
@@ -122,12 +123,9 @@ export const valueHeight = (value, maxValue, minValue, yAxisHeight) => {
    * @param {string} color 颜色
    */
 export const renderRect = (ctx, x, y, width = 20, height, color) => {
-  const halfWidth = width / 2
-
-  // 绘制矩形
   ctx.beginPath()
-  ctx.moveTo(x - halfWidth, y)
-  ctx.rect(x - halfWidth, y, width, height)
+  ctx.moveTo(x, y)
+  ctx.rect(x, y, width, height)
   ctx.fillStyle = color
   ctx.fill();
 }
@@ -162,4 +160,30 @@ export const mergeObject = (object = {}, target = {}) => {
     }
   }
   return res;
+}
+
+
+const Point = (x, y) => ({ x, y });
+/**
+ * 绘制圆角矩形
+ * @param {function} rect 矩形函数
+ * @param {number} r 圆角半径
+ * @param object ctx
+ */
+export const drawRoundedRect = (rect, r, ctx) => {
+  var ptA = Point(rect.x + r, rect.y);
+  var ptB = Point(rect.x + rect.width, rect.y);
+  var ptC = Point(rect.x + rect.width, rect.y + rect.height);
+  var ptD = Point(rect.x, rect.y + rect.height);
+  var ptE = Point(rect.x, rect.y);
+
+  ctx.beginPath();
+
+  ctx.moveTo(ptA.x, ptA.y);
+  ctx.arcTo(ptB.x, ptB.y, ptC.x, ptC.y, r);
+  ctx.arcTo(ptC.x, ptC.y, ptD.x, ptD.y, r);
+  ctx.arcTo(ptD.x, ptD.y, ptE.x, ptE.y, r);
+  ctx.arcTo(ptE.x, ptE.y, ptA.x, ptA.y, r);
+
+  ctx.stroke();
 }

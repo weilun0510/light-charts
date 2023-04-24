@@ -1,5 +1,5 @@
 import React, { useLayoutEffect } from 'react'
-import { COLOR, TEXT_COLOR, BG_COLOR } from '../../colors';
+import { COLOR, TEXT_COLOR, BG_COLOR, BORDER_COLOR } from '../../colors/light';
 import { renderLine, renderText, yAxisTickText, xAxisTickPointX, valueHeight, setCanvasSize, mergeObject } from '../../utils/common';
 
 const Line = ({ option = {}, style = { width: '600px', height: '300px' } }) => {
@@ -10,12 +10,12 @@ const Line = ({ option = {}, style = { width: '600px', height: '300px' } }) => {
     // y轴分段数量
     yAxisSplitNumber: 5,
     // 背景色
-    backgroundColor: 'DARK',
+    backgroundColor: BG_COLOR.BODY,
     // 对象放在...option后面做覆盖式更新
     // 坐标轴与容器间的边距
     grid: {
-      left: 50,
-      right: 50,
+      left: 30,
+      right: 30,
       top: 30,
       bottom: 30,
       height: 'auto',
@@ -28,9 +28,7 @@ const Line = ({ option = {}, style = { width: '600px', height: '300px' } }) => {
     },
   }
   const config = mergeObject(defaultConfig, option)
-  console.log('config: ', config);
   const { yData, xData, yAxisSplitNumber, grid, axisTick: { length: axisTickLength, show: axisTickShow }, backgroundColor } = config;
-  console.log('config: ', config);
 
   // 初始变量
   let yAxisHeight = ''  // y轴高度
@@ -59,9 +57,9 @@ const Line = ({ option = {}, style = { width: '600px', height: '300px' } }) => {
       let y = originalPointY - yAxisTickSpace * i
 
       // y轴文字
-      renderText(ctx, originalPointX - 10, y, yAxisTickText(i*yAxisTickSpace, maxValue, minValue, yAxisHeight, ), 'right', TEXT_COLOR.PRIMARY)
+      renderText(ctx, originalPointX - 10, y, yAxisTickText(i*yAxisTickSpace, maxValue, minValue, yAxisHeight, 0), 'right', TEXT_COLOR.PRIMARY)
       // 网格线
-      renderLine(ctx, originalPointX, y, xAxisTopPointX, y, COLOR.TIP_LINE)
+      renderLine(ctx, originalPointX, y, xAxisTopPointX, y, BORDER_COLOR.SECOND)
     }
 
     // 绘制x轴
@@ -71,7 +69,7 @@ const Line = ({ option = {}, style = { width: '600px', height: '300px' } }) => {
       const xAxisTickX = xAxisTickPointX(i, originalPointX, xAxisItemSpace)
 
       renderText(ctx, xAxisTickX + xAxisItemSpaceHalf, originalPointY + axisTickLength + 10, xData[i], 'center', TEXT_COLOR.PRIMARY)
-      axisTickShow && renderLine(ctx, xAxisTickX, originalPointY, xAxisTickX, originalPointY + axisTickLength, COLOR.LINE)
+      axisTickShow && renderLine(ctx, xAxisTickX, originalPointY, xAxisTickX, originalPointY + axisTickLength, BORDER_COLOR.SECOND)
     }
 
     // 折线坐标点集合
@@ -117,7 +115,7 @@ const Line = ({ option = {}, style = { width: '600px', height: '300px' } }) => {
 
   // DOM 变更之后，渲染之前 执行
   useLayoutEffect(() => {
-    const canvasEl = document.getElementById('lineId')
+    const canvasEl = document.getElementById('canvas')
     const ctx = canvasEl.getContext('2d')
 
     const { width, height } = setCanvasSize(canvasEl, style, grid.width, grid.height)
@@ -133,6 +131,6 @@ const Line = ({ option = {}, style = { width: '600px', height: '300px' } }) => {
     yData.length && renderCanvas(ctx)
   }, [yData])
 
-  return <canvas id="lineId" style={{ backgroundColor: BG_COLOR[backgroundColor] || backgroundColor }}></canvas>
+  return <canvas id="canvas" style={{ backgroundColor }} />
 }
 export default Line;

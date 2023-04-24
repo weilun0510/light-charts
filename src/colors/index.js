@@ -1,5 +1,5 @@
 const COLOR = {
-  PRIMARY: '#365FAD',
+  PRIMARY: '#207BF7',
   RED: '#EB5454',
   GREEN: '#46B262',
   LINE: '#FDFDFD',

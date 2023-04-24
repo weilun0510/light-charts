@@ -1,39 +1,36 @@
-import React, { useLayoutEffect } from 'react'
+import React, { useLayoutEffect, useState } from 'react'
 import './index.css';
 
-import { COLOR, TEXT_COLOR, BG_COLOR } from '../../colors';
-// import { COLOR, TEXT_COLOR, BG_COLOR } from '../../colors/light';
-import { renderLine, xAxisTickPointX, valueHeight, renderText, yAxisTickText, setCanvasSize, mergeObject } from '../../utils/common';
+import { COLOR, TEXT_COLOR, BG_COLOR, BORDER_COLOR, LINE_COLOR } from '../../colors/light';
+import { renderLine, xAxisTickPointX, valueHeight, renderText, yAxisTickText, setCanvasSize, mergeObject, drawRoundedRect } from '../../utils/common';
 
 const KLine = ({ option = {}, loadData, style = { width: '600px', height: '300px' } }) => {
   // 默认配置项
   const defaultConfig = {
-    // 蜡烛宽度
-    candleW: 20,
-    // 曲线类型
-    curveType: 'lowPrice',
+    // 均线类型
+    avgList: [5, 10, 20],
     // 是否绘制辅助线
     showTips: true,
     // 是否可以拖拽
     canDrag: true,
     // 是否可缩放
     canScroll: true,
-    pageSize: 10,
-    // 最多一页展示多少条数据（最多20条）
-    maxShowSize: 20,
+    pageSize: 40,
+    // 最多一页展示多少条数据（最多maxShowSize条）
+    maxShowSize: 80,
     // 基础默认配置
     // y轴分段数量
     yAxisSplitNumber: 4,
     // 背景色
-    backgroundColor: 'DARK',
+    backgroundColor: BG_COLOR.BODY,
     // x轴元素「文字和刻度」最大展示个数
     xAxisItemMaxShowNumber: 5,
     // 坐标轴与容器间的边距
     grid: {
-      left: 50,
-      right: 50,
-      top: 50,
-      bottom: 50,
+      left: 30,
+      right: 30,
+      top: 20,
+      bottom: 20,
       height: 'auto',
       width: 'auto',
     },
@@ -45,7 +42,20 @@ const KLine = ({ option = {}, loadData, style = { width: '600px', height: '300px
   }
 
   const config = mergeObject(defaultConfig, option)
-  const { yAxisSplitNumber, grid, axisTick: { length: tickWidth }, candleW, curveType, showTips, canDrag, canScroll, pageSize, maxShowSize, backgroundColor, xAxisItemMaxShowNumber } = config
+  const { yAxisSplitNumber, grid, axisTick: { length: tickLength }, avgList, showTips, canDrag, canScroll, pageSize, maxShowSize, backgroundColor, xAxisItemMaxShowNumber } = config;
+
+  const [MAList, setMAList] = useState(() => {
+    const map = new Map([]);
+    const colorMap = {
+      5: LINE_COLOR.YELLOW,
+      10: LINE_COLOR.ORANGE,
+      20: LINE_COLOR.BLUE,
+    }
+    avgList.forEach(day => {
+      map.set(day, { color: colorMap[day], curVal: '', list: [] })
+    })
+    return map
+  }) // 平均线集合)
 
   // 因为该函数只能执行一次，我们想要更新数据，又想要拿到上次的值，所以使用useRef
   // 如果能确保只执行一次，使用普通变量也可以，不能确保的话，使用useRef
@@ -70,28 +80,30 @@ const KLine = ({ option = {}, loadData, style = { width: '600px', height: '300px
   const yAxisVertexY = grid.top // y轴顶点纵坐标
 
   // 随画布元素数量变化而变化的属性
-  let xAxisItemSpace = '' // // x轴元素间距
+  let xAxisItemWidth = '' // // x轴元素宽度
   let xAxisItemLength = pageSize
+  let candleWidth = ''  // 蜡烛宽度
+
 
   /**
    * 绘制一串蜡烛（更新阶段）
    * @param {array} dataYAxisPoint 数据源
-   * @param {number} candleW 蜡烛宽度
+   * @param {number} candleWidth 蜡烛宽度
    */
-  const renderCandles = (dataYAxisPoint, candleW) => {
+  const renderCandles = (dataYAxisPoint, candleWidth) => {
     for (let i = 0, candleLength = dataYAxisPoint.length; i < candleLength; i++) {
-      renderCandle(dataYAxisPoint[i], xAxisTickPointX(i, originalPointX, xAxisItemSpace), candleW)
+      renderCandle(dataYAxisPoint[i], xAxisTickPointX(i, originalPointX, xAxisItemWidth), candleWidth)
     }
   }
 
   /**
    * 逐个渲染一串蜡烛（首次加载阶段）
    */
-  const oneByOneRenderCandle = (dataYAxisPoint, candleW) => {
+  const oneByOneRenderCandle = (dataYAxisPoint, candleWidth) => {
     for(let i = 0, candleLength = dataYAxisPoint.length; i < candleLength; i++) {
       (function(j) {
         setTimeout(() => {
-          renderCandle(dataYAxisPoint[j], xAxisTickPointX(j, originalPointX, xAxisItemSpace), candleW)
+          renderCandle(dataYAxisPoint[j], xAxisTickPointX(j, originalPointX, xAxisItemWidth), candleWidth)
         }, j * 100)
       }(i))
     }
@@ -101,39 +113,44 @@ const KLine = ({ option = {}, loadData, style = { width: '600px', height: '300px
    * 绘制单个蜡烛
    * @param {number} dataItem 当前元素数据
    * @param {number} xAxisItemPointX 蜡烛横坐标
-   * @param {number} candleW 蜡烛宽度
+   * @param {number} candleWidth 蜡烛宽度
    */
-  const renderCandle = (dataItem, xAxisItemPointX, candleW) => {
-    const halfCandleW = candleW / 2
+  const renderCandle = (dataItem, xAxisItemPointX, candleWidth) => {
+    const candleWidthHalf = candleWidth / 2
 
-    const { heightPrice, lowPrice, openingPrice, closingPice } = dataItem
+    const { highestPrice, lowestPrice, openingPrice, closingPrice } = dataItem
     let secondPointY = undefined;
     let thirdPointY = undefined;
     let candleColor = undefined;
 
-    if (closingPice < openingPrice) {
+    if (closingPrice < openingPrice) {
       // 涨
       candleColor = COLOR.RED
-      secondPointY = closingPice
+      secondPointY = closingPrice
       thirdPointY = openingPrice
     } else {
       candleColor = COLOR.GREEN
       secondPointY = openingPrice
-      thirdPointY = closingPice
+      thirdPointY = closingPrice
     }
 
     // 绘制蜡烛上影线
-    renderLine(ctx, xAxisItemPointX, heightPrice, xAxisItemPointX, secondPointY, candleColor, 1)
+    renderLine(ctx, xAxisItemPointX, highestPrice, xAxisItemPointX, secondPointY, candleColor, 1)
 
     // 绘制蜡烛下影线
-    renderLine(ctx, xAxisItemPointX, lowPrice, xAxisItemPointX, thirdPointY, candleColor, 1)
+    renderLine(ctx, xAxisItemPointX, lowestPrice, xAxisItemPointX, thirdPointY, candleColor, 1)
 
     // 绘制蜡烛实体（绘制矩形）
     ctx.beginPath()
-    ctx.moveTo(xAxisItemPointX - halfCandleW, secondPointY)
-    ctx.rect(xAxisItemPointX - halfCandleW, secondPointY, candleW, thirdPointY - secondPointY)
+    ctx.moveTo(xAxisItemPointX - candleWidthHalf, secondPointY)
+    ctx.rect(xAxisItemPointX - candleWidthHalf, secondPointY, candleWidth, thirdPointY - secondPointY)
     ctx.fillStyle = candleColor
-    ctx.fill();
+
+    if (candleColor === COLOR.RED) {
+      ctx.stroke()
+    } else {
+      ctx.fill();
+    }
   }
 
   /**
@@ -144,22 +161,27 @@ const KLine = ({ option = {}, loadData, style = { width: '600px', height: '300px
     const tipCanvas = document.getElementById('tipCanvas');
     const ctxTip = tipCanvas.getContext('2d');
 
-    const maxPrice = Math.max(...dataSource.map(x => x.heightPrice))
-    const minPrice = Math.min(...dataSource.map(x => x.lowPrice)) - 50
+    const maxPrice = Math.max(...dataSource.map(x => x.highestPrice)) + 5
+    const minPrice = Math.min(...dataSource.map(x => x.lowestPrice)) - 5
+
+    // 提示框内部样式配置
+    const padding_horizontal = 10;
+    const padding_vertical = 20;
+    const item_space = 20;
 
     // 提示框元素宽度
     let tipInfoElWidth = 100
-    // 提示框内的日期元素
-    let tipInfoElHeight = 80
+    // 提示框高度
+    let tipInfoElHeight = 120
     // x轴y轴上的提示背景框的宽、高
-    const xyAxisTipBoxWidth = grid.left
+    const xyAxisTipBoxWidth = 50
     const xyAxisTipBoxHeight = 20
 
     // 判断鼠标是否在k线图内容区域
     const isContentArea = (e) => {
       const { offsetX, offsetY } = e
-      return  offsetX > originalPointX &&
-              offsetX < canvasWidth - grid.right - xAxisWidth / xAxisItemLength &&
+      return  offsetX > originalPointX - candleWidth/2 &&
+              offsetX < canvasWidth + candleWidth/2 - grid.right - xAxisWidth / xAxisItemLength &&
               offsetY > grid.top &&
               offsetY < yAxisOriginPointY
     }
@@ -173,13 +195,12 @@ const KLine = ({ option = {}, loadData, style = { width: '600px', height: '300px
       // 不在内容区域则不进行绘制
       if (!isContentArea(e)) return
 
-
       // 绘制水平辅助线
       ctxTip.beginPath();
       ctxTip.setLineDash([3, 3]); // 设置虚线样式
       ctxTip.moveTo(originalPointX, offsetY);
       ctxTip.lineTo(canvasWidth - grid.right - xAxisWidth / xAxisItemLength, offsetY);
-      ctxTip.strokeStyle = COLOR.LINE
+      ctxTip.strokeStyle = BORDER_COLOR.SECOND
       ctxTip.stroke();
 
       // 绘制垂直辅助线
@@ -187,59 +208,69 @@ const KLine = ({ option = {}, loadData, style = { width: '600px', height: '300px
       ctxTip.setLineDash([3, 3]);
       ctxTip.moveTo(offsetX, grid.top);
       ctxTip.lineTo(offsetX, yAxisOriginPointY);
+      ctxTip.strokeStyle = BORDER_COLOR.PRIMARY
       ctxTip.stroke();
 
       // 绘制y轴tip文字背景框
       ctxTip.beginPath();
-      ctxTip.rect(0, offsetY - xyAxisTipBoxHeight / 2, xyAxisTipBoxWidth, xyAxisTipBoxHeight);
-      ctxTip.fillStyle = '#B9B8CE'
+      ctxTip.rect(originalPointX, offsetY - xyAxisTipBoxHeight / 2, xyAxisTipBoxWidth, xyAxisTipBoxHeight);
+      ctxTip.fillStyle = BORDER_COLOR.SECOND
       ctxTip.fill();
 
       // 绘制y轴tip文字
-      renderText(ctxTip, originalPointX - 30, offsetY, yAxisTickText(yAxisOriginPointY - offsetY, maxPrice, minPrice, yAxisHeight), 'center', COLOR.WHITE)
+      renderText(ctxTip, originalPointX + 25, offsetY, yAxisTickText(yAxisOriginPointY - offsetY, maxPrice, minPrice, yAxisHeight), 'center', COLOR.WHITE)
 
       // 绘制x轴tip文字背景框
       ctxTip.beginPath();
       ctxTip.rect(offsetX - xyAxisTipBoxWidth / 2, yAxisOriginPointY, xyAxisTipBoxWidth, xyAxisTipBoxHeight);
-      ctxTip.fillStyle = '#B9B8CE'
+      ctxTip.fillStyle = BORDER_COLOR.SECOND
       ctxTip.fill();
 
       // 绘制x轴tip文字
       // 获取x轴元素在x轴上的下标
       const xTipIndex = Math.round((offsetX - originalPointX) / xAxisWidth * xAxisItemLength)
-      renderText(ctxTip, offsetX, yAxisOriginPointY + xyAxisTipBoxHeight / 2, dataSource.map((x) => x.date)[xTipIndex] || '', 'center', COLOR.WHITE)
+      renderText(ctxTip, offsetX, yAxisOriginPointY + xyAxisTipBoxHeight / 2, dataSource.map((x) => x.date)[xTipIndex] || '', 'center', COLOR.WHITE);
+
+      // 更新均线值
+      [...MAList].map((x) => {
+        const [day, obj] = x;
+        const curVal = obj.list[xTipIndex]
+        document.getElementById(`avg${day}`).innerText = `MA${day} ${curVal}`
+      })
 
       // 绘制提示框
-      let tipInfoPointX = grid.left + xAxisWidth - tipInfoElWidth  //  提示框的开始横坐标
-      if (xTipIndex > xAxisItemLength / 2) {
-        tipInfoPointX = grid.left
+      const dist = 10 // 提示框距离鼠标的距离
+      const marginTop = yAxisVertexY + 30 // 提示框距离画布顶部的距离
+      let tipInfoPointX = offsetX + dist  //  提示框的开始横坐标
+      // TODO
+      if (offsetX >  (canvasWidth / 2 - grid.left)) {
+        // if (xTipIndex > xAxisItemLength / 2) {
+        tipInfoPointX = offsetX - tipInfoElWidth - dist
       }
       ctxTip.beginPath()
-      ctxTip.rect(tipInfoPointX, yAxisVertexY, tipInfoElWidth, tipInfoElHeight)
-      ctxTip.fillStyle = COLOR.WHITE
+      drawRoundedRect({
+        x: tipInfoPointX,
+        y: marginTop,
+        width: tipInfoElWidth,
+        height: tipInfoElHeight
+      }, 10, ctxTip)
+      ctxTip.fillStyle = BG_COLOR.COMPONENT
+      ctxTip.globalAlpha = 0.9
       ctxTip.fill();
 
-      const { date, heightPrice, lowPrice, openingPrice, closingPice } = dataSource[xTipIndex]
-
+      const { date, highestPrice, lowestPrice, openingPrice, closingPrice } = dataSource[xTipIndex]
       const dataArr = [
-        { label: 'open', value: openingPrice },
-        { label: 'close', value: closingPice },
-        { label: 'lowest', value: lowPrice },
-        { label: 'highest', value: heightPrice },
+        { label: '开盘', value: openingPrice },
+        { label: '收盘', value: closingPrice },
+        { label: '最高', value: highestPrice },
+        { label: '最低', value: lowestPrice },
       ]
-
-      // 日期
-      renderText(ctxTip, tipInfoPointX + 11, yAxisVertexY + 10, date, 'left', TEXT_COLOR.SECOND)
-      // 当前数据
-      dataArr.forEach(({ label, value }, i) => {
-        // 设置提示框元素的样式和内容
-        renderText(ctxTip, tipInfoPointX + 15, yAxisVertexY + 25 + i * 15, `${label}: ${value}`, 'left', TEXT_COLOR.SECOND)
-
-        // 绘制小圆点
-        ctxTip.beginPath();
-        ctxTip.arc(tipInfoPointX + 10, yAxisVertexY + 25 + i * 15, 1, 0, 2 * Math.PI);
-        ctxTip.fillStyle = COLOR.PRIMARY;
-        ctxTip.fill()
+      const cloneDataArr = [{ label: '时间', value: date }, ...dataArr];
+      // 绘制提示框内的元素
+      cloneDataArr.forEach(({ label, value }, i) => {
+        const y = marginTop + padding_vertical + i * item_space;
+        renderText(ctxTip, tipInfoPointX + padding_horizontal, y, label, 'left', TEXT_COLOR.PRIMARY, '13px')
+        renderText(ctxTip, tipInfoPointX + tipInfoElWidth - padding_horizontal, y, value, 'right', i !== 0 ? TEXT_COLOR.PRIMARY : TEXT_COLOR.RED, '13px')
       })
     }, false)
   }
@@ -278,7 +309,7 @@ const KLine = ({ option = {}, loadData, style = { width: '600px', height: '300px
       draggableNode.style.cursor = 'grabbing'
 
       // 如果拖动距离大于x轴元素间距，则插入数据
-      if ( horizontalDragDistance > xAxisItemSpace) {
+      if ( horizontalDragDistance > xAxisItemWidth) {
         // 数据处理：根据上一刻的光标位置，判断鼠标拖动方向，更新数据重新渲染
         if (lastPosition !== offsetX) {
           console.log('拖拽中....');
@@ -305,7 +336,7 @@ const KLine = ({ option = {}, loadData, style = { width: '600px', height: '300px
         ctx.clearRect(0, 0, canvasWidth, canvasHeight)
 
         // 触发重新渲染
-        renderKLineChart()
+        renderCanvas()
       }
 
       lastPosition = offsetX
@@ -332,7 +363,7 @@ const KLine = ({ option = {}, loadData, style = { width: '600px', height: '300px
 
     // 鼠标按下时，显示拖拽元素在最上层
     tipCanvas.addEventListener('mousedown', function (e) {
-      const kWrapNode = document.getElementById('kWrap')
+      const kWrapNode = document.getElementById('canvasWrap')
       const draggableNode = document.getElementById('draggable')
 
       // 如果拖拽元素存在，则显示（避免重复创建）
@@ -367,7 +398,7 @@ const KLine = ({ option = {}, loadData, style = { width: '600px', height: '300px
 
   // 缩放
   const getScroll = () => {
-    const kWrapNode = document.getElementById('kWrap')
+    const kWrapNode = document.getElementById('canvasWrap')
     let timer = null
 
     // 监听滚轮事件（只考虑chrome）
@@ -416,22 +447,23 @@ const KLine = ({ option = {}, loadData, style = { width: '600px', height: '300px
       timer = setTimeout(wheelStop, 500);
 
       ctx.clearRect(0, 0, canvasWidth, canvasHeight)
-      renderKLineChart()
+      renderCanvas()
     }, false)
   }
 
   /**
-   * 绘制k线图
+   * 绘制画布
    */
-   const renderKLineChart = () => {
+   const renderCanvas = () => {
     if (dataSource.length === 0) return
 
     xAxisItemLength = dataSource.length
-    xAxisItemSpace = xAxisWidth / xAxisItemLength
-    console.log('xAxisItemSpace: ', xAxisItemSpace);
+    xAxisItemWidth = xAxisWidth / xAxisItemLength
+    const itemSpace = 3 // 表示x轴元素间距
+    candleWidth = (xAxisWidth - itemSpace * (xAxisItemLength - 1)) / xAxisItemLength
 
-    const maxPrice = Math.max(...dataSource.map(x => x.heightPrice))
-    const minPrice = Math.min(...dataSource.map(x => x.lowPrice)) - 50
+    const maxPrice = Math.max(...dataSource.map(x => x.highestPrice)) + 5
+    const minPrice = Math.min(...dataSource.map(x => x.lowestPrice)) - 5
 
     console.log('--------开始绘制k线图');
 
@@ -450,67 +482,126 @@ const KLine = ({ option = {}, loadData, style = { width: '600px', height: '300px
       return newIt
     })
 
-    // 绘制y轴文字与刻度
+    // 绘制y轴文字和网格线
     for (let i = 0; i < yAxisSplitNumber; i++) {
       let sx = originalPointX
-      let ex = originalPointX + tickWidth
+      let ex = originalPointX + tickLength
       let y = yAxisOriginPointY - yAxisTickSpace * i
-      renderText(ctx, sx - candleW / 2 - 3, y, yAxisTickText(i*yAxisTickSpace, maxPrice, minPrice, yAxisHeight), 'right', TEXT_COLOR.PRIMARY)
+      // renderText(ctx, sx - candleWidth / 2 - 3, y, yAxisTickText(i*yAxisTickSpace, maxPrice, minPrice, yAxisHeight), 'right', TEXT_COLOR.PRIMARY)
+      renderLine(ctx, sx, y, xAxisVertexX, y, BORDER_COLOR.SECOND) // 网格线
     }
 
     // 绘制x轴
-    renderLine(ctx, originalPointX, yAxisOriginPointY, xAxisVertexX, yAxisOriginPointY, COLOR.LINE)
+    // renderLine(ctx, originalPointX, yAxisOriginPointY, xAxisVertexX, yAxisOriginPointY, BORDER_COLOR.SECOND)
 
     // 绘制x轴刻度与文字
     const remainder = Math.ceil(xAxisItemLength / (xAxisItemMaxShowNumber - 1))
     for (let i = 0; i < xAxisItemLength; i++) {
-      const xAxisTickX = xAxisTickPointX(i, originalPointX, xAxisItemSpace)
+      const xAxisTickX = xAxisTickPointX(i, originalPointX, xAxisItemWidth)
 
       // 隔点展示
-      if (i % remainder === 0 || i === xAxisItemLength - 1) {
-        renderText(ctx, xAxisTickX, yAxisOriginPointY + tickWidth + 10, dataSource.map((x) => x.date)[i], 'center', TEXT_COLOR.PRIMARY)
-        renderLine(ctx, xAxisTickX, yAxisOriginPointY, xAxisTickX, yAxisOriginPointY + tickWidth, COLOR.LINE)
+      // if (i % remainder === 0 || i === xAxisItemLength - 1) {
+      if (i % remainder === 0) {
+        renderText(ctx, xAxisTickX, yAxisOriginPointY + tickLength + 10, dataSource.map((x) => x.date)[i], 'center', TEXT_COLOR.PRIMARY)
+        renderLine(ctx, xAxisTickX, yAxisOriginPointY, xAxisTickX, yAxisOriginPointY + tickLength, BORDER_COLOR.SECOND) // 刻度线
+        renderLine(ctx, xAxisTickX, yAxisOriginPointY, xAxisTickX, yAxisVertexY, BORDER_COLOR.SECOND) // 网格线
       }
     }
 
     /**
-     * 获取当前点以及前后控制点坐集合
-     * @param {string} curveType 曲线类型 { heightPrice, lowPrice, openingPrice, closingPice }
-     * @param {array} dataYAxisPoint 数据源
+     * 绘制贝塞尔曲线
+     * @param {array} controlPoint 控制点集合: [{ curX: lowestPricePointX, curY: lowestPricePointY, prevControlX, prevControlY, nextControlX, nextControlY } ...]
+     * @param {string}  color 曲线颜色
+     */
+    const renderBezierCurve = (controlPoint, color) => {
+      ctx.beginPath();
+      for (let i = 0; i < controlPoint.length; i++) {
+        const {
+          curX,
+          curY,
+          prevControlX,
+          prevControlY,
+        } = controlPoint[i]
+
+        if (i > 0 && i < controlPoint.length) {
+          const prevNode = controlPoint[i - 1]
+          ctx.bezierCurveTo(prevNode.nextControlX, prevNode.nextControlY, prevControlX, prevControlY, curX, curY);
+          ctx.strokeStyle = color
+          ctx.lineWidth = 0.7
+        } else if ( i === 0) {
+          ctx.moveTo(curX, curY);
+        }
+      }
+      ctx.stroke();
+    }
+
+    /**
+     * 求均线值在纵坐标中的值的集合。Moving average 移动平均线。MA = (C1+C2+C3+C4+C5+....+Cn)/n C 为收盘价，n 为移动平均周期数
+     * @param {number} day 前day天
+     * @returns array 纵坐标集合
+     */
+    const getMA = (day) => {
+      // const result = [];
+      const avgList = []
+      dataSource.map((it, i) => {
+        let beforeDays = [] // 前day日，开盘价集合
+        if (i < day) {
+          beforeDays = [...leftDataSource.slice(-day + i), ...dataSource.slice(0, i)];
+        } else {
+          beforeDays = [...dataSource.slice(i-day, i)]
+        }
+        const totalOpenPrice = beforeDays.reduce((prev, item) => prev + item.openingPrice, 0)
+        // result.push(tranPriceToOrdinate())
+        avgList.push(totalOpenPrice / day)
+
+        // 初始化时，当前日期的均线值
+        if (i === dataSource.length - 1) {
+          setMAList(MAList.set(day, { ...MAList.get(day), curVal: totalOpenPrice / day }))
+        }
+      })
+      setMAList(MAList.set(day, { ...MAList.get(day), list: avgList }))
+
+      return avgList.map(x => tranPriceToOrdinate(x));
+    }
+
+    /**
+     * 获取平均线控制点集合
+     * @param {number} day 前day天
      * @returns [array] 当前点以及前后控制点坐集合
      */
-    const getControlPointInfo = (curveType = curveType, dataYAxisPoint) => {
+    const getMAControlPointInfo = (day) => {
       let controlPoint = []
+      const _MAList = getMA(day)
 
       for (let i = 0; i < xAxisItemLength; i++) {
-        const pricePointX = xAxisTickPointX(i, originalPointX, xAxisItemSpace)
-        const pricePointY = dataYAxisPoint[i][curveType]
-        let prevNode = {}
-        let nextNode = {}
+        const pricePointX = xAxisTickPointX(i, originalPointX, xAxisItemWidth)
+        const pricePointY = _MAList[i]
+        let prevNode = 0  // 前控制的纵坐标
+        let nextNode = 0
 
         // 边界处理：在首尾加入虚拟点，补全第一个元素没有前控制点，末尾元素没有后控制点的情况
         if (i === 0) {
-          prevNode = { heightPrice: tranPriceToOrdinate(1000), lowPrice: tranPriceToOrdinate(600), openingPrice: tranPriceToOrdinate(780), closingPice: tranPriceToOrdinate(899) }
-          nextNode = dataYAxisPoint[i + 1]
+          prevNode = pricePointY + 1
+          nextNode = _MAList[i + 1]
         } else if (i === xAxisItemLength - 1) {
-          prevNode = dataYAxisPoint[i - 1]
-          nextNode = { heightPrice: tranPriceToOrdinate(1021), lowPrice: tranPriceToOrdinate(720), openingPrice: tranPriceToOrdinate(782), closingPice: tranPriceToOrdinate(889) }
+          prevNode = _MAList[i - 1]
+          nextNode = pricePointY + 1
         } else {
-          prevNode = dataYAxisPoint[i - 1]
-          nextNode = dataYAxisPoint[i + 1]
+          prevNode = _MAList[i - 1]
+          nextNode = _MAList[i + 1]
         }
         // 前后点构成的三角形
         // b: 三角形的高
-        const triangleHeight = Math.abs(nextNode[curveType] - prevNode[curveType])
+        const triangleHeight = Math.abs(nextNode - prevNode)
 
         // a: 三角形底边
-        const triangleBottomLine = xAxisItemSpace * 2
+        const triangleBottomLine = xAxisItemWidth * 2
         // c: 三角形斜边 = (高的平方+底边的平方)的平方根
         const triangleHypotenuse = Math.sqrt(Math.pow(triangleHeight, 2) +  Math.pow(triangleBottomLine, 2))
 
         // 前后控制点为斜边的三角形
         // C: 控制点三角形斜边长度(自定义)
-        const controlPointW = xAxisItemSpace * 0.5
+        const controlPointW = xAxisItemWidth * 0.5
         // A: 控制点三角形底边
         const controlPointBottomLine = controlPointW * triangleBottomLine / triangleHypotenuse
         // B: 控制点三角形的高
@@ -522,7 +613,7 @@ const KLine = ({ option = {}, loadData, style = { width: '600px', height: '300px
         let nextControlY = undefined
 
         // 相对于canvas的坐标，如果前个控制点纵坐标小于下个控制点的纵坐标（相当于视觉上的左高右低）
-        if (prevNode[curveType] < nextNode[curveType]) {
+        if (prevNode < nextNode) {
           // 左高右低
           prevControlY = pricePointY - controlPointHeight / 2
           nextControlY = pricePointY + controlPointHeight / 2
@@ -544,43 +635,20 @@ const KLine = ({ option = {}, loadData, style = { width: '600px', height: '300px
       return controlPoint
     }
 
-    /**
-     * 绘制贝塞尔曲线
-     * @param {array} controlPoint 控制点集合:  [{ curX: lowPricePointX, curY: lowPricePointY, prevControlX, prevControlY, nextControlX, nextControlY } ...]
-     */
-    const renderBezierCurve = (controlPoint) => {
-      ctx.beginPath();
-      for (let i = 0; i < controlPoint.length; i++) {
-        const {
-          curX,
-          curY,
-          prevControlX,
-          prevControlY,
-        } = controlPoint[i]
-
-        if (i > 0 && i < controlPoint.length) {
-          const prevNode = controlPoint[i - 1]
-          ctx.bezierCurveTo(prevNode.nextControlX, prevNode.nextControlY, prevControlX, prevControlY, curX, curY);
-          ctx.strokeStyle = COLOR.PRIMARY
-          ctx.lineWidth = 1
-        } else if ( i === 0) {
-          ctx.moveTo(curX, curY);
-        }
-      }
-      ctx.stroke();
-    }
-
-    // 绘制贝塞尔曲线
-    renderBezierCurve(getControlPointInfo(curveType, dataYAxisPoint))
+    // 绘制平均线
+    [...MAList].forEach((x) => {
+      const [day, obj] = x;
+      renderBezierCurve(getMAControlPointInfo(day), obj.color)
+    })
 
     if (init) {
-      oneByOneRenderCandle(dataYAxisPoint, candleW)
+      oneByOneRenderCandle(dataYAxisPoint, candleWidth)
       showTips && renderTipCanvas();
       canDrag && getDrag();
       canScroll && getScroll();
     } else {
       // 绘制一串蜡烛
-      renderCandles(dataYAxisPoint, candleW)
+      renderCandles(dataYAxisPoint, candleWidth)
     }
 
     console.log('绘制完成');
@@ -606,25 +674,36 @@ const KLine = ({ option = {}, loadData, style = { width: '600px', height: '300px
     yAxisOriginPointY = height - grid.bottom
     yAxisHeight = height - (grid.top + grid.bottom)
     yAxisTickSpace = yAxisHeight / (yAxisSplitNumber - 1)
-    xAxisVertexX = width - originalPointX
-    xAxisWidth = width - originalPointX - grid.right
-    xAxisItemSpace = xAxisWidth / xAxisItemLength
+    xAxisVertexX = width - grid.left
+    xAxisWidth = width - grid.left - grid.right
+    xAxisItemWidth = xAxisWidth / xAxisItemLength
 
     // 请求数据
     loadData(pageSize + maxShowSize).then(res => {
       const data = res;
       dataSource = data.slice(maxShowSize)
       leftDataSource = data.slice(0, maxShowSize)
-      renderKLineChart()
+      renderCanvas()
     })
   }, [])
 
   console.log('-----------render--------------');
+
   return (
-    <div id="kWrap">
-      <canvas id="canvas" style={{ backgroundColor: BG_COLOR[backgroundColor] || backgroundColor }}></canvas>
-      <canvas id="tipCanvas"></canvas>
-    </div>
+    <>
+      <div className="labels-container">
+        <span className='abg-label'>均线</span>
+        {[...MAList].map((x) => {
+          const [type, obj] = x;
+          return <span key={`avg${type}`} style={{ color: obj.color }} id={`avg${type}`}>{`MA${type} ${obj.curVal}`}</span>
+        })}
+      </div>
+      <div id="canvasWrap">
+        <canvas id="canvas" style={{ backgroundColor }}></canvas>
+        <canvas id="tipCanvas"></canvas>
+      </div>
+    </>
+
   )
 }
 export default React.memo(KLine)

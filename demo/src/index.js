@@ -95,8 +95,8 @@ const Demo = () => {
   }
 
   return (
-    <div>
-      <h1>echarts-for-abc Demo</h1>
+    <div style={{ marginLeft: '20px' }}>
+      <h1>light-charts preview</h1>
       <div style={{ marginBottom: '20px' }}>
         {chartMap.map(x => (
           <button
@@ -110,7 +110,7 @@ const Demo = () => {
 
       {type === 1 && (
         <KLine
-          onWheelStop={onWheelStop}
+          // onWheelStop={onWheelStop}
           // option={{
           //   grid: {
           //     left: 30,
@@ -124,7 +124,9 @@ const Demo = () => {
           //   canScroll: true,
           //   backgroundColor: '#f5f5f5'
           // }}
-          // style={{ width: '600px', height: '300px' }}
+          option={{
+            pageSize: 30
+          }}
           loadData={getKLineData}
         />
       )}
@@ -133,6 +135,8 @@ const Demo = () => {
           option={{
             yData: lineData.map(x => x.value),
             xData: lineData.map(x => x.date),
+            // yData: [...lineData.map(x => x.value), ...lineData.map(x => x.value), ...lineData.map(x => x.value)],
+            // xData: [...lineData.map(x => x.date),...lineData.map(x => x.date),...lineData.map(x => x.date)],
             // yAxisSplitNumber: 4,
             // grid: {
             //   left: 50,
@@ -145,7 +149,7 @@ const Demo = () => {
             // },
             // backgroundColor: '#798891'
           }}
-          // style={{ width: '600px', height: '300px' }}
+          style={{ width: '600px', height: '300px' }}
         />
       )}
       {type === 3 && (
@@ -169,7 +173,6 @@ const Demo = () => {
           }}
           style={{ width: '600px', height: '300px' }}
         />
-        // <div id="lineId" style={{ width: '600px', height: '300px' }} />
       )}
 
     </div>

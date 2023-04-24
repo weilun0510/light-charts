@@ -1,4 +1,14 @@
-#kWrap{
+.labels-container{
+  font-size: 12px;
+}
+.labels-container .abg-label {
+  margin-right: 8px;;
+}
+.labels-container span{
+  margin-right: 10px;
+}
+
+#canvasWrap{
   position: relative;
   left: 0;
 }
