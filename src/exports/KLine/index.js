@@ -695,7 +695,7 @@ const KLine = ({ option = {}, loadData, style = { width: '600px', height: '300px
         <span className='abg-label'>均线</span>
         {[...MAList].map((x) => {
           const [type, obj] = x;
-          return <span key={`avg${type}`} style={{ color: obj.color }} id={`avg${type}`}>{`MA${type} ${obj.curVal}`}</span>
+          return <span key={`avg${type}`} style={{ color: obj ? obj.color : ''  }} id={`avg${type}`}>{`MA${type} ${obj ? obj.curVal : ''}`}</span>
         })}
       </div>
       <div id="canvasWrap">
