@@ -100,6 +100,7 @@ const Demo = () => {
       <div style={{ marginBottom: '20px' }}>
         {chartMap.map(x => (
           <button
+            key={x.value}
             onClick={() => setState(x.value)}
             style={{ marginRight: '10px', color: type === x.value ? '#365FAD' : '' }}
           >
@@ -125,7 +126,8 @@ const Demo = () => {
           //   backgroundColor: '#f5f5f5'
           // }}
           option={{
-            pageSize: 30
+            pageSize: 30,
+            avgList: [10, 20]
           }}
           loadData={getKLineData}
         />

@@ -232,11 +232,10 @@ const KLine = ({ option = {}, loadData, style = { width: '600px', height: '300px
       renderText(ctxTip, offsetX, yAxisOriginPointY + xyAxisTipBoxHeight / 2, dataSource.map((x) => x.date)[xTipIndex] || '', 'center', COLOR.WHITE);
 
       // 更新均线值
-      [...MAList].map((x) => {
-        const [day, obj] = x;
+      for (let [day, obj] of MAList)  {
         const curVal = obj.list[xTipIndex]
         document.getElementById(`avg${day}`).innerText = `MA${day} ${curVal}`
-      })
+      }
 
       // 绘制提示框
       const dist = 10 // 提示框距离鼠标的距离
@@ -636,10 +635,9 @@ const KLine = ({ option = {}, loadData, style = { width: '600px', height: '300px
     }
 
     // 绘制平均线
-    [...MAList].forEach((x) => {
-      const [day, obj] = x;
-      renderBezierCurve(getMAControlPointInfo(day), obj.color)
-    })
+    for (let [day, obj] of MAList)  {
+      renderBezierCurve(getMAControlPointInfo(day), obj)
+    }
 
     if (init) {
       oneByOneRenderCandle(dataYAxisPoint, candleWidth)
@@ -688,14 +686,13 @@ const KLine = ({ option = {}, loadData, style = { width: '600px', height: '300px
   }, [])
 
   console.log('-----------render--------------');
-
   return (
     <>
       <div className="labels-container">
         <span className='abg-label'>均线</span>
-        {[...MAList].map((x) => {
-          const [type, obj] = x;
-          return <span key={`avg${type}`} style={{ color: obj ? obj.color : ''  }} id={`avg${type}`}>{`MA${type} ${obj ? obj.curVal : ''}`}</span>
+        {avgList.map(day => {
+          const { color, curVal } = MAList.get(day)
+          return <span key={`avg${day}`} style={{ color }} id={`avg${day}`}>{`MA${day} ${curVal}`}</span>
         })}
       </div>
       <div id="canvasWrap">
@@ -703,7 +700,6 @@ const KLine = ({ option = {}, loadData, style = { width: '600px', height: '300px
         <canvas id="tipCanvas"></canvas>
       </div>
     </>
-
   )
 }
 export default React.memo(KLine)
